@@ -10,6 +10,11 @@ const fb_client = new FB_client({
     prefix: process.env.PREFIX
 })
 
+await Promise.all([
+    fb_client.loginWithAppState(process.env.APPSTATE_BASE64!, { selfListen: false }),
+    dc_client.login(process.env.TOKEN)
+])
+
 dc_client.once('ready', () => {
     console.log(`[ DC ] Logged in as ${dc_client.user?.tag}`)
 
@@ -36,11 +41,9 @@ dc_client.once('ready', () => {
         status: (process.env["RICH_PRESENCE.STATUS"] as PresenceStatusData)
     })
 })
+
 fb_client.once('ready', (_, bid) => {
     console.log(`[ FB ] Logged in as ${bid}`);
+})
 
-    handleEvent({ dc_client, fb_client });
-});
-
-dc_client.login(process.env.TOKEN);
-fb_client.loginWithAppState(process.env.APPSTATE_BASE64 as string, { selfListen: false });
+handleEvent({ dc_client, fb_client });
