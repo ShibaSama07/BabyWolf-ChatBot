@@ -8,7 +8,7 @@ const sequelize = new Sequelize({
 
 interface ChannelMap extends Model<InferAttributes<ChannelMap>, InferCreationAttributes<ChannelMap>> {
     channelID: string;
-    threadID: string
+    threadID: string;
 }
 
 export const ChannelMap = sequelize.define<ChannelMap>('ChannelMaps', {
