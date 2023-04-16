@@ -1,4 +1,4 @@
-import { ChannelMap } from "./database/index.js";
+import { ChannelMap, Thread } from "./database/index.js";
 import {
   ChannelType,
   EmbedBuilder,
@@ -27,6 +27,7 @@ type FbMessageOption = {
 type CreateChannelOption = {
   guild: Guild;
   threadID: string;
+  threadName: string;
   cate: GuildBasedChannel;
   client: dc_client;
 };
@@ -39,12 +40,13 @@ type DcMessageOption = {
 async function createChannel({
   guild,
   threadID,
+  threadName,
   cate,
   client,
 }: CreateChannelOption) {
   try {
     const channel = await guild?.channels.create({
-      name: threadID,
+      name: threadName,
       type: ChannelType.GuildText,
       parent: cate.id,
       permissionOverwrites: [
@@ -64,6 +66,12 @@ async function createChannel({
         },
       ],
     });
+
+    if(!(await Thread.findOne({ where: { threadID } }))) {
+      await Thread.create({ threadID, threadName });
+
+      console.log("Created data for thread " + threadID);
+    }
 
     await ChannelMap.create({ channelID: channel?.id!, threadID: threadID });
 
@@ -219,9 +227,15 @@ export default async function handleEvent({
 
         if (!cate) return;
 
+        let threadName = (await Thread.findOne({
+          where: {
+            threadID: message.threadID
+          }
+        }))?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName || "";
         await createChannel({
           guild,
           threadID: message.threadID,
+          threadName,
           cate,
           client: dc_client,
         });
@@ -260,9 +274,15 @@ export default async function handleEvent({
           );
           if (!cate) return;
 
+          let threadName = (await Thread.findOne({
+            where: {
+              threadID: event.threadID
+            }
+          }))?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName || "";
           await createChannel({
             guild,
             threadID: event.threadID,
+            threadName,
             cate,
             client: dc_client,
           });

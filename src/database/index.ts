@@ -11,6 +11,11 @@ interface ChannelMap extends Model<InferAttributes<ChannelMap>, InferCreationAtt
     threadID: string;
 }
 
+interface Thread extends Model<InferAttributes<Thread>, InferCreationAttributes<Thread>> {
+    threadID: string;
+    threadName: string;
+}
+
 export const ChannelMap = sequelize.define<ChannelMap>('ChannelMaps', {
     channelID: {
         type: DataTypes.STRING,
@@ -23,4 +28,15 @@ export const ChannelMap = sequelize.define<ChannelMap>('ChannelMaps', {
     timestamps: false
 })
 
+export const Thread = sequelize.define<Thread>('Threads', {
+    threadID: {
+        type: DataTypes.STRING,
+        primaryKey: true
+    },
+    threadName: {
+        type: DataTypes.STRING
+    }
+})
+
 ChannelMap.sync({ force: false });
+Thread.sync({ force: false });

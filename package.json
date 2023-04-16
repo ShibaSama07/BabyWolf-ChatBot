@@ -5,9 +5,9 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "dev": "pm2 start --node-args='-r dotenv/config' src/index.ts --no-daemon",
-    "start": "pm2 start --node-args='-r dotenv/config' dist/index.js --no-daemon"
+    "build": "tsc && pm2 install typescript",
+    "dev": "ts-node -r dotenv/config src/index.ts",
+    "start": "pm2 start ecosystem.config.cjs --no-daemon"
   },
   "keywords": [
     "discord bot",
@@ -22,8 +22,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/express": "^4.17.17",
-    "ts-node": "^10.9.1",
     "pm2": "^5.3.0",
+    "ts-node": "^10.9.1",
     "typescript": "^5.0.4"
   },
   "dependencies": {
