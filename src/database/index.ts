@@ -36,6 +36,8 @@ export const Thread = sequelize.define<Thread>('Threads', {
     threadName: {
         type: DataTypes.STRING
     }
+}, {
+    timestamps: false
 })
 
 ChannelMap.sync({ force: false });

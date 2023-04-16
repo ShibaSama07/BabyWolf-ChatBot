@@ -5,7 +5,7 @@
   "main": "index.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc && pm2 install typescript",
+    "build": "tsc",
     "dev": "ts-node -r dotenv/config src/index.ts",
     "start": "pm2 start ecosystem.config.cjs --no-daemon"
   },

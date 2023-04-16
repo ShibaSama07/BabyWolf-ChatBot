@@ -67,7 +67,7 @@ async function createChannel({
       ],
     });
 
-    if(!(await Thread.findOne({ where: { threadID } }))) {
+    if (!(await Thread.findOne({ where: { threadID } }))) {
       await Thread.create({ threadID, threadName });
 
       console.log("Created data for thread " + threadID);
@@ -169,14 +169,15 @@ export default async function handleEvent({
   dc_client,
   fb_client,
 }: HandleEventOption) {
-  var data = await ChannelMap.findAll();
+  var channelMap = await ChannelMap.findAll();
+  var threads = await Thread.findAll();
   var guild = await dc_client.guilds.fetch(process.env.GUILDID!);
 
   dc_client.on("messageCreate", async (message) => {
     try {
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
       if (message.guildId != process.env.GUILDID) return;
-      const channel = data.find(
+      const channel = channelMap.find(
         (e) => e.dataValues.channelID == message.channelId
       );
       if (!channel) return;
@@ -206,7 +207,7 @@ export default async function handleEvent({
   dc_client.on("channelDelete", async (channel) => {
     try {
       await destroyData({ channelID: channel.id });
-      data = await ChannelMap.findAll();
+      channelMap = await ChannelMap.findAll();
     } catch (e) {
       console.error(e);
     }
@@ -215,7 +216,7 @@ export default async function handleEvent({
   fb_client.on("message", async (message) => {
     try {
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
-      const thread = data.find(
+      const thread = channelMap.find(
         (e) => e.dataValues.threadID == message.threadID
       );
       if (!thread) {
@@ -227,11 +228,9 @@ export default async function handleEvent({
 
         if (!cate) return;
 
-        let threadName = (await Thread.findOne({
-          where: {
-            threadID: message.threadID
-          }
-        }))?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName || "";
+        let threadName = threads.find(
+          (e) => e.dataValues.threadID == message.threadID
+        )?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName || "Facebook User " + message.threadID;
         await createChannel({
           guild,
           threadID: message.threadID,
@@ -240,18 +239,17 @@ export default async function handleEvent({
           client: dc_client,
         });
 
-        data = await ChannelMap.findAll();
+        channelMap = await ChannelMap.findAll();
+        threads = await Thread.findAll();
       } else {
         const channel = await guild.channels.fetch(thread.dataValues.channelID)
           .catch(async () => {
             await destroyData({ channelID: thread.dataValues.channelID })
-            data = await ChannelMap.findAll();
+            channelMap = await ChannelMap.findAll();
             return;
           })
         if (channel?.isTextBased()) {
           const options = await handleMessage(message);
-          const threadinfo = await fb_client.getApi()?.getThreadInfo(message.threadID);
-          console.log(threadinfo);
           await channel.send(options as unknown as MessagePayload);
         }
       }
@@ -274,11 +272,9 @@ export default async function handleEvent({
           );
           if (!cate) return;
 
-          let threadName = (await Thread.findOne({
-            where: {
-              threadID: event.threadID
-            }
-          }))?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName || "";
+          let threadName = threads.find(
+            (e) => e.dataValues.threadID == event.threadID
+          )?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName || "Facebook User " + event.threadID;
           await createChannel({
             guild,
             threadID: event.threadID,
@@ -287,7 +283,8 @@ export default async function handleEvent({
             client: dc_client,
           });
 
-          data = await ChannelMap.findAll();
+          channelMap = await ChannelMap.findAll();
+          threads = await Thread.findAll();
         }
 
         fb_client
@@ -301,13 +298,18 @@ export default async function handleEvent({
       if (event.logMessageType === "log:unsubscribe") {
         if (await ChannelMap.findOne({ where: { threadID: event.threadID } })) {
           await destroyData({ threadID: event.threadID });
-          data = await ChannelMap.findAll();
+          channelMap = await ChannelMap.findAll();
         }
       }
     } catch (e) {
       console.error(e);
     }
   });
+
+  setInterval(() => {
+    console.log("Restart process!");
+    process.exit(1);
+  }, 1000 * 60 * 60);
 }
 
 /*
