@@ -1,7 +1,7 @@
 import { Sequelize, DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
 
 const sequelize = new Sequelize({
-    storage: 'data.sqlite',
+    storage: './database/data.sqlite',
     dialect: 'sqlite',
     logging: false
 })

@@ -4,8 +4,8 @@ module.exports = {
     apps: [
         {
             name: process.env.NAME,
-            script: 'main.js',
-            cwd: './',
+            script: 'index.js',
+            cwd: './dist/',
             env: { ...process.env }
         }
     ]
