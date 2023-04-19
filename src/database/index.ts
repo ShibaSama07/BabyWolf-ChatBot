@@ -1,25 +1,11 @@
-import { Sequelize, DataTypes, Model, type InferAttributes, type InferCreationAttributes } from "sequelize";
+import { Sequelize, DataTypes } from "sequelize";
+import { IFCAU_ChannelMap, IFCAU_Thread } from "../type";
 
 const sequelize = new Sequelize({
     storage: 'data.sqlite',
     dialect: 'sqlite',
     logging: false
 })
-
-export interface IFCAU_ChannelMap extends Model<InferAttributes<IFCAU_ChannelMap>, InferCreationAttributes<IFCAU_ChannelMap>> {
-    channelID: string;
-    threadID: string;
-    data: {
-        enableGlobalThreads: boolean;
-        allowThreads: string[];
-        denyThreads: string[];
-    }
-}
-
-export interface IFCAU_Thread extends Model<InferAttributes<IFCAU_Thread>, InferCreationAttributes<IFCAU_Thread>> {
-    threadID: string;
-    threadName: string;
-}
 
 export const ChannelMap = sequelize.define<IFCAU_ChannelMap>('ChannelMaps', {
     channelID: {
