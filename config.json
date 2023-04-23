@@ -1,0 +1,9 @@
+{
+	"NAME": "BabyWolf",
+	"RICH_PRESENCE": {
+        "TYPE": "watching",
+        "CONTENT": "Facebook",
+        "STATUS": "idle"
+    },
+	"enableGlobalThreads": true
+}

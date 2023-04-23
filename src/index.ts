@@ -1,17 +1,18 @@
 import { PresenceStatusData, REST, Routes } from "discord.js";
 import { Client as FB_client } from "fca-utils";
 import handleEvent from "./handleEvent.js";
-import { ExtendClient } from "./type.js";
-import { readdirSync } from "fs";
+import { ExtendClient, type ConfigType } from "./type.js";
+import { readdirSync, readFileSync } from "fs";
 import type { Command } from "./type.js";
+import path from "path";
+
+const config = JSON.parse(readFileSync(path.join(process.cwd(), "config.json"), { encoding: "utf8" })) as ConfigType;
 
 const dc_client = new ExtendClient({
     intents: ["MessageContent", "Guilds", "DirectMessages", "GuildMessages"]
 })
 
-const fb_client = new FB_client({
-    prefix: process.env.PREFIX
-})
+const fb_client = new FB_client();
 
 await Promise.all([
     fb_client.loginWithAppState(process.env.APPSTATE_BASE64!, { selfListen: false }),
@@ -19,12 +20,12 @@ await Promise.all([
 ])
 
 dc_client.once('ready', async () => {
-
     console.log(`[ DC ] Logged in as ${dc_client.user?.tag}`);
 
-    const allComand = readdirSync("./commands");
+    const mainPath = process.env.NODE_ENV === "production" ? "./dist" : "./src"
+    const allComand = readdirSync(mainPath + "/commands");
     for (let path of allComand) {
-        const command: Command = (await import("./commands" + path)).default;
+        const command: Command = (await import("./commands/" + path)).default;
         dc_client.commands.set(command.config.name, command);
     }
 
@@ -42,7 +43,7 @@ dc_client.once('ready', async () => {
 
         console.log(`Successfully reloaded ${data.length} application (/) commands.`);
 
-        dc_client.user?.setUsername(process.env.NAME!);
+        dc_client.user?.setUsername(config.NAME);
 
         const ActivityTypeOptions = [
             { name: "competing", type: 5 },
@@ -53,16 +54,16 @@ dc_client.once('ready', async () => {
             { name: "watching", type: 3 }
         ]
 
-        const ActivityType = process.env["RICH_PRESENCE.TYPE"]
+        const ActivityType = config.RICH_PRESENCE.TYPE
 
         dc_client.user?.setPresence({
             activities: [
                 {
-                    name: process.env["RICH_PRESENCE.CONTENT"],
+                    name: config.RICH_PRESENCE.CONTENT,
                     type: ActivityTypeOptions.find(e => e.name === ActivityType)?.type
                 }
             ],
-            status: (process.env["RICH_PRESENCE.STATUS"] as PresenceStatusData)
+            status: (config.RICH_PRESENCE.STATUS as PresenceStatusData)
         })
     } catch (e) {
         console.error(e);
@@ -73,4 +74,4 @@ fb_client.once('ready', (_, bid) => {
     console.log(`[ FB ] Logged in as ${bid}`);
 })
 
-handleEvent({ dc_client, fb_client });
+handleEvent({ dc_client, fb_client, config });

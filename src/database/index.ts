@@ -1,5 +1,6 @@
 import { Sequelize, DataTypes } from "sequelize";
-import { IFCAU_ChannelMap, IFCAU_Thread } from "../type";
+import { DB_ChannelMap, DB_Thread } from "../type";
+import { Controller } from "./controller.js";
 
 const sequelize = new Sequelize({
     storage: 'data.sqlite',
@@ -7,7 +8,7 @@ const sequelize = new Sequelize({
     logging: false
 })
 
-export const ChannelMap = sequelize.define<IFCAU_ChannelMap>('ChannelMaps', {
+export const ChannelMap = sequelize.define<DB_ChannelMap>('ChannelMaps', {
     channelID: {
         type: DataTypes.STRING,
         primaryKey: true
@@ -15,14 +16,18 @@ export const ChannelMap = sequelize.define<IFCAU_ChannelMap>('ChannelMaps', {
     threadID: {
         type: DataTypes.STRING
     },
-    data: {
-        type: DataTypes.JSON
+    allow: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true
+    },
+    webhookURL: {
+        type: DataTypes.STRING
     }
 }, {
     timestamps: false
 })
 
-export const Thread = sequelize.define<IFCAU_Thread>('Threads', {
+export const Thread = sequelize.define<DB_Thread>('Threads', {
     threadID: {
         type: DataTypes.STRING,
         primaryKey: true
@@ -34,5 +39,7 @@ export const Thread = sequelize.define<IFCAU_Thread>('Threads', {
     timestamps: false
 })
 
-ChannelMap.sync({ force: false });
-Thread.sync({ force: false });
+export const controller = new Controller();
+
+await ChannelMap.sync({ force: false });
+await Thread.sync({ force: false });

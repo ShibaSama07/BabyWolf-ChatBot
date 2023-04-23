@@ -1,51 +1,40 @@
-import { ChannelMap, Thread } from "./database/index.js";
 import {
   ChannelType,
-  EmbedBuilder,
-  MessagePayload,
   OverwriteType,
+  WebhookClient,
+  type Guild,
+  type WebhookMessageCreateOptions
 } from "discord.js";
-import type { Client as dc_client, Guild } from "discord.js";
-import { Client as fb_client, TextMessage } from "fca-utils";
+import { TextMessage, Client as fb_client } from "fca-utils";
+import { ChannelMap, Thread, controller } from "./database/index.js";
+import type { ConfigType, ExtendClient } from "./type.js";
 import { getStream } from "./utils.js";
 
 type HandleEventOption = {
-  dc_client: dc_client;
+  dc_client: ExtendClient;
   fb_client: fb_client;
-};
-
-type FbMessageOption = {
-  content?: string;
-  embeds?: EmbedBuilder[];
-  files?: {
-    attachment: unknown;
-    name: string;
-  }[];
+  config: ConfigType
 };
 
 type CreateChannelOption = {
   guild: Guild;
   threadID: string;
   threadName: string;
-  client: dc_client;
+  client: ExtendClient;
+  config: ConfigType;
 };
 
-type DcMessageOption = {
+type FbMessageOption = {
   body: string;
   attachment?: any | any[];
 };
-
-const defaultData = {
-  enableGlobalThreads: true,
-  allowThreads: [],
-  denyThreads: []
-}
 
 async function createChannel({
   guild,
   threadID,
   threadName,
   client,
+  config
 }: CreateChannelOption) {
   try {
     let cate = guild.channels.cache.find(
@@ -78,13 +67,15 @@ async function createChannel({
       ],
     });
 
+    let webhook = await channel.createWebhook({ name: config.NAME });
+
     if (!(await Thread.findOne({ where: { threadID } }))) {
       await Thread.create({ threadID, threadName });
 
       console.log("Created data for thread " + threadID);
     }
 
-    await ChannelMap.create({ channelID: channel?.id!, threadID: threadID, data: defaultData });
+    await ChannelMap.create({ channelID: channel?.id!, threadID: threadID, allow: true, webhookURL: webhook.url });
 
     console.log("Created channel " + channel.id);
   } catch (e) {
@@ -107,93 +98,39 @@ async function destroyData(where: { channelID?: string, threadID?: string }) {
 }
 
 async function handleMessage(message: TextMessage) {
-  let options: FbMessageOption = {};
-  let { attachments } = message;
-
-  let embed = new EmbedBuilder()
-    .setColor("Random")
-    .setFooter({
-      text: `From ${message.senderID}\nIn ${message.threadID}`,
-      iconURL: `https://graph.facebook.com/${message.senderID}/picture?type=large&width=500&height=500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`,
-    })
-    .setTimestamp();
-  if (attachments.length == 1) {
-    if (
-      attachments[0].type === "photo" ||
-      attachments[0].type === "sticker" ||
-      attachments[0].type === "animated_image"
-    ) {
-      embed.setImage(attachments[0].url);
-      options.embeds = [embed];
-    } else if (
-      attachments[0].type === "video" ||
-      attachments[0].type === "audio"
-    ) {
-      if (
-        attachments[0].type === "audio" &&
-        getExt(attachments[0].url) === ".mp4"
-      ) {
-        embed.setDescription(".mp4 format audio files are not supported");
-        options.embeds = [embed];
-      } else {
-        options.files = [
-          { attachment: attachments[0].url, name: attachments[0].filename },
-        ];
-        options.content =
-          message.body + `\n\nFrom ${message.senderID}\nIn ${message.threadID}`;
-      }
-    } else {
-      embed.setDescription("(location, file or share)");
-      options.embeds = [embed];
-    }
-  } else if (attachments.length > 1) {
-    options.files = [];
-    for (let atm of attachments) {
-      if (
-        atm.type === "location" ||
-        atm.type === "file" ||
-        atm.type === "share" ||
-        (atm.type === "audio" && getExt(atm.url) == ".mp4")
-      )
-        continue;
-      options.files.push({
-        attachment: atm.url,
-        name: atm.ID + getExt(atm.url)[0],
-      });
-    }
-    options.content =
-      message.body + `\n\nFrom ${message.senderID}\nIn ${message.threadID}`;
-  } else {
-    embed.setDescription(message.body != "" ? message.body : " ");
-    options.embeds = [embed];
-  }
+  let options: WebhookMessageCreateOptions = {};
+  options.username = message.senderID;
+  options.avatarURL = `https://graph.facebook.com/${message.senderID}/picture?type=large&width=500&height=500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+  options.content = message.body;
+  options.files = message.attachments.map(x => {
+    return x.url;
+  });
 
   return options;
-}
-
-function getExt(url: string) {
-  let matchUrl = url.substring(url.lastIndexOf("/")).match(/([^.]+)\?/g)![0];
-  return "." + matchUrl.slice(matchUrl.length * -1, -1);
 }
 
 export default async function handleEvent({
   dc_client,
   fb_client,
+  config
 }: HandleEventOption) {
-  var channelMap = await ChannelMap.findAll();
-  var threads = await Thread.findAll();
   var guild = await dc_client.guilds.fetch(process.env.GUILDID!);
 
   dc_client.on("messageCreate", async (message) => {
     try {
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
       if (message.guildId != process.env.GUILDID) return;
-      const channel = channelMap.find(
-        (e) => e.dataValues.channelID == message.channelId
-      );
+      let channel = await ChannelMap.findOne({
+        where: {
+          channelID: message.channelId
+        }
+      });
+
       if (!channel) return;
+      if (!config.enableGlobalThreads && !channel.allow) return;
+
       if (message.author.bot) return;
-      let option: DcMessageOption = {
+      let option: FbMessageOption = {
         body: `${message.content}\n\n${message.author.tag}`,
       };
 
@@ -215,10 +152,28 @@ export default async function handleEvent({
     }
   });
 
+  dc_client.on("interactionCreate", interaction => {
+    if (interaction.isCommand()) {
+      try {
+        let commandName = interaction.commandName;
+        let command = dc_client.commands.get(commandName)!;
+        let option = {
+          client: dc_client,
+          interaction: interaction,
+          controller,
+          config
+        }
+
+        command.execute(option);
+      } catch (e) {
+        console.error(e)
+      }
+    }
+  })
+
   dc_client.on("channelDelete", async (channel) => {
     try {
       await destroyData({ channelID: channel.id });
-      channelMap = await ChannelMap.findAll();
     } catch (e) {
       console.error(e);
     }
@@ -226,33 +181,43 @@ export default async function handleEvent({
 
   fb_client.on("message", async (message) => {
     try {
+      let thread = await ChannelMap.findOne({
+        where: {
+          threadID: message.threadID
+        }
+      })
+
+      if (!config.enableGlobalThreads && !thread?.allow) return;
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
-      const thread = channelMap.find(
-        (e) => e.dataValues.threadID == message.threadID
-      );
+
       if (!thread) {
-        let threadName = threads.find(
-          (e) => e.dataValues.threadID == message.threadID
-        )?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName || "Facebook User " + message.threadID;
+        let threadName =
+          (await Thread.findOne({
+            where: {
+              threadID: message.threadID
+            }
+          }))?.threadName ||
+          (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName ||
+          "Facebook User " + message.threadID;
+
         await createChannel({
           guild,
           threadID: message.threadID,
           threadName,
           client: dc_client,
+          config
         });
-
-        channelMap = await ChannelMap.findAll();
-        threads = await Thread.findAll();
       } else {
-        const channel = await guild.channels.fetch(thread.dataValues.channelID)
-          .catch(async () => {
-            await destroyData({ channelID: thread.dataValues.channelID })
-            channelMap = await ChannelMap.findAll();
-            return;
-          })
+        const channel = await guild.channels.fetch(thread.channelID)
+          .catch(async (e) => {
+            await destroyData({ channelID: thread!.channelID })
+            throw e;
+          });
+
         if (channel?.isTextBased()) {
           const options = await handleMessage(message);
-          await channel.send(options as unknown as MessagePayload);
+          let webhook = new WebhookClient({ url: thread.webhookURL });
+          await webhook.send(options);
         }
       }
     } catch (e) {
@@ -262,29 +227,35 @@ export default async function handleEvent({
 
   fb_client.on("event", async (event) => {
     try {
-      if (event.logMessageType === "log:subscribe") {
-        const thread = await ChannelMap.findOne({
-          where: { threadID: event.threadID },
+      const thread = await ChannelMap.findOne({
+        where: { threadID: event.threadID },
+      });
+
+      if (!config.enableGlobalThreads && !thread?.allow) return;
+      if (!thread) {
+        let threadName =
+          (await Thread.findOne({
+            where: {
+              threadID: event.threadID
+            }
+          }))?.threadName ||
+          (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName ||
+          "Facebook User " + event.threadID;
+
+        await createChannel({
+          guild,
+          threadID: event.threadID,
+          threadName,
+          client: dc_client,
+          config
         });
-        if (!thread) {
-          let threadName = threads.find(
-            (e) => e.dataValues.threadID == event.threadID
-          )?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName || "Facebook User " + event.threadID;
-          await createChannel({
-            guild,
-            threadID: event.threadID,
-            threadName,
-            client: dc_client,
-          });
+      }
 
-          channelMap = await ChannelMap.findAll();
-          threads = await Thread.findAll();
-        }
-
+      if (event.logMessageType === "log:subscribe") {
         fb_client
           .getApi()
           ?.changeNickname(
-            process.env.NAME as string,
+            config.NAME,
             event.threadID,
             event.author
           );
@@ -292,37 +263,18 @@ export default async function handleEvent({
       if (event.logMessageType === "log:unsubscribe") {
         if (await ChannelMap.findOne({ where: { threadID: event.threadID } })) {
           await destroyData({ threadID: event.threadID });
-          channelMap = await ChannelMap.findAll();
         }
       }
 
       if (event.logMessageType === "log:thread-name") {
-        let thread = threads.find(
-          (e) => e.dataValues.threadID == event.threadID
-        );
-
-        if (!thread) {
-          let threadName = threads.find(
-            (e) => e.dataValues.threadID == event.threadID
-          )?.dataValues.threadName || (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName || "Facebook User " + event.threadID;
-          await createChannel({
-            guild,
-            threadID: event.threadID,
-            threadName,
-            client: dc_client,
-          });
-
-          channelMap = await ChannelMap.findAll();
-          threads = await Thread.findAll();
-        } else {
+        if (thread) {
           let channelID = (await ChannelMap.findOne({ where: { threadID: event.threadID } }))!.dataValues.channelID;
           const channel = await guild.channels.fetch(channelID)
             .catch(async () => {
-              await destroyData({ channelID: channelID })
-              channelMap = await ChannelMap.findAll();
+              await destroyData({ channelID: channelID });
               return;
             })
-          
+
           let name = event.logMessageData.name;
           await channel?.edit({ name })
 

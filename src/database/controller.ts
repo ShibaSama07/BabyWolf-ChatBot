@@ -1,5 +1,5 @@
-import ChannelMapModel from "./controllers/channelmap";
-import ThreadModel from "./controllers/thread";
+import ChannelMapModel from "./controllers/channelmap.js";
+import ThreadModel from "./controllers/thread.js";
 
 export class Controller {
     ChannelMap = ChannelMapModel()

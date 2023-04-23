@@ -1,16 +1,17 @@
-import { Client, Collection, Interaction, type SlashCommandBuilder } from "discord.js";
+import { Client, Collection, CommandInteraction, type SlashCommandBuilder } from "discord.js";
 import { Model, type InferAttributes, type InferCreationAttributes } from "sequelize"
 import type { Controller } from "./database/controller";
 
 type CommandArgs = {
     client: ExtendClient
-    interaction: Interaction
-    controller: Controller
+    interaction: CommandInteraction
+    controller: Controller,
+    config: ConfigType
 }
 
 type CommandType = {
     config: SlashCommandBuilder,
-    execute: ({ client, interaction, controller }: CommandArgs) => Promise<void> | void;
+    execute: ({ client, interaction, controller, config }: CommandArgs) => Promise<void> | void;
 }
 
 export class Command {
@@ -34,17 +35,24 @@ export class ExtendClient extends Client {
     commands = new Collection<string, CommandType>();
 }
 
-export interface IFCAU_ChannelMap extends Model<InferAttributes<IFCAU_ChannelMap>, InferCreationAttributes<IFCAU_ChannelMap>> {
+export interface DB_ChannelMap extends Model<InferAttributes<DB_ChannelMap>, InferCreationAttributes<DB_ChannelMap>> {
     channelID: string;
     threadID: string;
-    data: {
-        enableGlobalThreads: boolean;
-        allowThreads: string[];
-        denyThreads: string[];
-    }
+    allow: boolean;
+    webhookURL: string;
 }
 
-export interface IFCAU_Thread extends Model<InferAttributes<IFCAU_Thread>, InferCreationAttributes<IFCAU_Thread>> {
+export interface DB_Thread extends Model<InferAttributes<DB_Thread>, InferCreationAttributes<DB_Thread>> {
     threadID: string;
     threadName: string;
 }
+
+export type ConfigType = {
+    NAME: string;
+    RICH_PRESENCE: {
+        TYPE: string;
+        CONTENT: string;
+        STATUS: string;
+    };
+    enableGlobalThreads: boolean;
+};
