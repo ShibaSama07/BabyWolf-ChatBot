@@ -6,7 +6,7 @@ import {
   type WebhookMessageCreateOptions
 } from "discord.js";
 import { TextMessage, Client as fb_client } from "fca-utils";
-import { ChannelMap, Thread, controller } from "./database/index.js";
+import { controller } from "./database/index.js";
 import type { ConfigType, ExtendClient } from "./type.js";
 import { getStream } from "./utils.js";
 
@@ -69,13 +69,13 @@ async function createChannel({
 
     let webhook = await channel.createWebhook({ name: config.NAME });
 
-    if (!(await Thread.findOne({ where: { threadID } }))) {
-      await Thread.create({ threadID, threadName });
+    if (!(await controller.Thread.getData({ threadID }))) {
+      await controller.Thread.createData({ threadID, threadName });
 
       console.log("Created data for thread " + threadID);
     }
 
-    await ChannelMap.create({ channelID: channel?.id!, threadID: threadID, allow: true, webhookURL: webhook.url });
+    await controller.ChannelMap.createData({ channelID: channel?.id!, threadID: threadID, allow: true, webhookURL: webhook.url });
 
     console.log("Created channel " + channel.id);
   } catch (e) {
@@ -86,9 +86,7 @@ async function createChannel({
 async function destroyData(where: { channelID?: string, threadID?: string }) {
   try {
     await Promise.all([
-      ChannelMap.destroy({
-        where
-      }),
+      controller.ChannelMap.destroyData(where),
     ]);
 
     console.log("Deleted data " + Object.values(where).join(" "));
@@ -120,11 +118,7 @@ export default async function handleEvent({
     try {
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
       if (message.guildId != process.env.GUILDID) return;
-      let channel = await ChannelMap.findOne({
-        where: {
-          channelID: message.channelId
-        }
-      });
+      let channel = await controller.ChannelMap.getData({ channelID: message.channelId });
 
       if (!channel) return;
       if (!config.enableGlobalThreads && !channel.allow) return;
@@ -181,22 +175,14 @@ export default async function handleEvent({
 
   fb_client.on("message", async (message) => {
     try {
-      let thread = await ChannelMap.findOne({
-        where: {
-          threadID: message.threadID
-        }
-      })
-
+      let thread = await controller.ChannelMap.getData({ threadID: message.threadID })
+      
       if (!config.enableGlobalThreads && !thread?.allow) return;
       if (!guild) guild = await dc_client.guilds.fetch(process.env.GUILDID!);
 
       if (!thread) {
         let threadName =
-          (await Thread.findOne({
-            where: {
-              threadID: message.threadID
-            }
-          }))?.threadName ||
+          (await controller.Thread.getData({ threadID: message.threadID }))?.threadName ||
           (await fb_client.getApi()?.getThreadInfo(message.threadID))?.threadName ||
           "Facebook User " + message.threadID;
 
@@ -227,18 +213,12 @@ export default async function handleEvent({
 
   fb_client.on("event", async (event) => {
     try {
-      const thread = await ChannelMap.findOne({
-        where: { threadID: event.threadID },
-      });
+      const thread = await controller.ChannelMap.getData({ threadID: event.threadID });
 
       if (!config.enableGlobalThreads && !thread?.allow) return;
       if (!thread) {
         let threadName =
-          (await Thread.findOne({
-            where: {
-              threadID: event.threadID
-            }
-          }))?.threadName ||
+          (await controller.Thread.getData({ threadID: event.threadID }))?.threadName ||
           (await fb_client.getApi()?.getThreadInfo(event.threadID))?.threadName ||
           "Facebook User " + event.threadID;
 
@@ -261,14 +241,14 @@ export default async function handleEvent({
           );
       }
       if (event.logMessageType === "log:unsubscribe") {
-        if (await ChannelMap.findOne({ where: { threadID: event.threadID } })) {
+        if (await controller.ChannelMap.getData({ threadID: event.threadID })) {
           await destroyData({ threadID: event.threadID });
         }
       }
 
       if (event.logMessageType === "log:thread-name") {
         if (thread) {
-          let channelID = (await ChannelMap.findOne({ where: { threadID: event.threadID } }))!.dataValues.channelID;
+          let channelID = (await controller.ChannelMap.getData({ threadID: event.threadID }))!.channelID;
           const channel = await guild.channels.fetch(channelID)
             .catch(async () => {
               await destroyData({ channelID: channelID });

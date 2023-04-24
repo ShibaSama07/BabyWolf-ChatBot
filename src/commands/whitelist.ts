@@ -12,7 +12,7 @@ export default new Command({
             "en-GB": "Enable/disable thread whitelist",
             "vi": "Bật/tắt danh sách cho phép hoạt động"
         }),
-    execute: async ({ interaction, controller, config }) => {
+    execute: async ({ interaction, config }) => {
         if(!interaction.guild) return;
         if(!interaction.channel) return;
 

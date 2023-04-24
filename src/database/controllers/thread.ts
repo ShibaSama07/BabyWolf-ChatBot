@@ -4,8 +4,7 @@ export default function ThreadModel() {
     async function getData(where: { threadID: string }) {
         try {
             let data = await Thread.findOne({ where });
-            if(!data) return false;
-            return data.dataValues
+            return data?.dataValues
         } catch (e) {
             console.error(e);
         }

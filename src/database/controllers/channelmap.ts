@@ -4,8 +4,7 @@ export default function ChannelMapModel() {
     async function getData(where: { channelID?: string, threadID?: string }) {
         try {
             let data = await ChannelMap.findOne({ where });
-            if (!data) return false;
-            return data.dataValues;
+            return data?.dataValues;
         } catch (e) {
             console.error(e);
         }
