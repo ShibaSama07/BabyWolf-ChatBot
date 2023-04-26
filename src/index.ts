@@ -13,6 +13,7 @@ const dc_client = new ExtendClient({
 })
 
 const fb_client = new FB_client();
+fb_client.openServer(3000);
 
 await Promise.all([
     fb_client.loginWithAppState(process.env.APPSTATE_BASE64!, { selfListen: false }),
